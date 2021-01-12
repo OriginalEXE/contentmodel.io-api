@@ -1,0 +1,98 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type User {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  email: String
+  name: String!
+  type: String
+  picture: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Login {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  auth0Id: String!
+  fresh: Boolean
+  user: User!
+}
+
+type ContentModel {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  cms: String!
+  slug: String!
+  title: String!
+  description: String!
+  userId: String!
+  user: User!
+  model: String!
+  position: String!
+}
+
+type PaginationInfo {
+  hasNext: Boolean!
+  hasPrev: Boolean!
+  total: Int!
+}
+
+type PaginatedContentModel {
+  items: [ContentModel!]!
+  pagination: PaginationInfo!
+}
+
+type Query {
+  me: User
+  contentModels(search: String = "", user: String = "", page: Int = 1, count: Int = 20): PaginatedContentModel!
+  contentModelBySlug(slug: String!): ContentModel
+}
+
+type Mutation {
+  createUser(createUser: CreateUserInput!): Login!
+  createContentModel(createContentModel: CreateContentModelInput!): ContentModel!
+  updateContentModel(updateContentModel: UpdateContentModelInput!): ContentModel!
+  deleteContentModel(deleteContentModel: DeleteContentModelInput!): ContentModel!
+}
+
+input CreateUserInput {
+  email: String!
+  name: String
+  picture: String
+}
+
+input CreateContentModelInput {
+  title: String!
+  description: String!
+  version: CreateContentModelVersionInput!
+}
+
+input CreateContentModelVersionInput {
+  model: String!
+  position: String!
+}
+
+input UpdateContentModelInput {
+  id: String!
+  title: String
+  description: String
+  version: UpdateContentModelVersionInput
+}
+
+input UpdateContentModelVersionInput {
+  model: String
+  position: String
+}
+
+input DeleteContentModelInput {
+  id: String!
+}
