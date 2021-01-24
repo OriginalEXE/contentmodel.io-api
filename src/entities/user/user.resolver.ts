@@ -16,6 +16,7 @@ import { GqlAuthGuard } from '../../auth/gql-auth.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Login } from '../login/login.model';
 import { CreateUserInput } from './inputs/create-user-input';
+import { UpdateUserInput } from './inputs/update-user-input';
 import { User } from './user.model';
 import { UserService } from './user.service';
 
@@ -141,7 +142,6 @@ export class UserResolver {
               name: name.trim(),
               email,
               picture,
-              type: 'free',
             },
           },
         },
@@ -156,5 +156,38 @@ export class UserResolver {
       ...createdLogin,
       fresh: true,
     };
+  }
+
+  @Mutation(() => User)
+  @UseGuards(GqlAuthGuard)
+  async updateUser(
+    @AccessTokenEntity() accessToken: AccessToken,
+    @Args('updateUser') updateUser: UpdateUserInput,
+  ): Promise<User> {
+    const user = await this.userService.getUserByAuth0Id({
+      auth0Id: accessToken.sub,
+    });
+
+    const { id, contentful_token_read } = updateUser;
+
+    if (user.id !== id) {
+      throw new BadRequestException('Could not find the user');
+    }
+
+    const [updatedUserError, updatedUser] = await catchify(
+      this.prisma.user.update({
+        where: { id },
+        data: {
+          contentful_token_read,
+        },
+      }),
+    );
+
+    if (updatedUserError !== null) {
+      console.error(updatedUserError);
+      throw new InternalServerErrorException('Something went wrong');
+    }
+
+    return updatedUser;
   }
 }

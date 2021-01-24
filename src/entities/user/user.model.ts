@@ -11,7 +11,7 @@ export class User extends Model {
   name: string;
 
   @Field(() => String, { nullable: true })
-  type: string;
+  contentful_token_read: string;
 
   @Field(() => String)
   picture: string;

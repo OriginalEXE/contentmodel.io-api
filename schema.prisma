@@ -4,14 +4,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  email     String   @unique
-  name      String
-  type      String
-  picture   String
-  logins    Login[]
+  id                    String   @id @default(uuid())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  email                 String   @unique
+  name                  String
+  picture               String
+  contentful_token_read String?
+  logins                Login[]
 }
 
 model Login {

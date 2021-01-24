@@ -8,7 +8,7 @@ type User {
   updatedAt: DateTime!
   email: String
   name: String!
-  type: String
+  contentful_token_read: String
   picture: String!
 }
 
@@ -59,6 +59,7 @@ type Query {
 
 type Mutation {
   createUser(createUser: CreateUserInput!): Login!
+  updateUser(updateUser: UpdateUserInput!): User!
   createContentModel(createContentModel: CreateContentModelInput!): ContentModel!
   updateContentModel(updateContentModel: UpdateContentModelInput!): ContentModel!
   deleteContentModel(deleteContentModel: DeleteContentModelInput!): ContentModel!
@@ -68,6 +69,11 @@ input CreateUserInput {
   email: String!
   name: String
   picture: String
+}
+
+input UpdateUserInput {
+  id: String!
+  contentful_token_read: String
 }
 
 input CreateContentModelInput {
