@@ -100,7 +100,7 @@ export class ContentModelResolver {
     if (user !== '') {
       queryArgs.where = {
         ...queryArgs.where,
-        AND: [{ user }],
+        AND: [{ userId: user }],
       };
     }
 
