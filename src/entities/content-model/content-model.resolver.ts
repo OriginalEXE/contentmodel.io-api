@@ -36,8 +36,6 @@ import { PaginatedContentModel } from './paginated-content-model.model';
 import parseContentModel from './parsers/parseContentModel';
 import parseContentModelPosition from './parsers/parseContentModelPosition';
 
-let DEV_GENERATING_DATA = false;
-
 const nanoid = customAlphabet(
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
   11,
@@ -64,78 +62,6 @@ export class ContentModelResolver {
     @Args('search', { type: () => String, nullable: true, defaultValue: '' })
     search: string,
   ): Promise<PaginatedContentModel> {
-    if (DEV_GENERATING_DATA === false) {
-      DEV_GENERATING_DATA = true;
-
-      const [, contentModels] = await catchify(
-        this.prisma.contentModel.findMany({
-          orderBy: {
-            createdAt: 'desc' as const,
-          },
-          skip: 0,
-          take: 100,
-          include: {
-            versions: {
-              orderBy: {
-                version: 'desc' as const,
-              },
-              take: 1,
-              include: {
-                image: true,
-                imageNoConnections: true,
-              },
-            },
-            user: true,
-            ogMetaImage: true,
-          },
-        }),
-      );
-
-      contentModels.forEach((contentModel) => {
-        this.contentModelService.generateContentModelScreenshots({
-          ...contentModel,
-          model: JSON.stringify(contentModel.versions[0].model),
-          position: JSON.stringify(contentModel.versions[0].position),
-          ogMetaImage: contentModel.ogMetaImage
-            ? {
-                width: contentModel.ogMetaImage.width,
-                height: contentModel.ogMetaImage.height,
-                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-                  contentModel.ogMetaImage,
-                ),
-                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-                  contentModel.ogMetaImage,
-                ),
-              }
-            : null,
-          image: contentModel.versions[0].image
-            ? {
-                width: contentModel.versions[0].image.width,
-                height: contentModel.versions[0].image.height,
-                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-                  contentModel.versions[0].image,
-                ),
-                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-                  contentModel.versions[0].image,
-                ),
-              }
-            : null,
-          imageNoConnections: contentModel.versions[0].imageNoConnections
-            ? {
-                width: contentModel.versions[0].imageNoConnections.width,
-                height: contentModel.versions[0].imageNoConnections.height,
-                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-                  contentModel.versions[0].imageNoConnections,
-                ),
-                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-                  contentModel.versions[0].imageNoConnections,
-                ),
-              }
-            : null,
-        });
-      });
-    }
-
     const paginationCount = Math.min(1000, Math.max(1, count));
     const paginationPage = Math.max(1, page);
 
