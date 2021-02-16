@@ -26,6 +26,13 @@ type Login {
   user: User!
 }
 
+type ImageAsset {
+  src: String!
+  path: String!
+  width: Float!
+  height: Float!
+}
+
 type ContentModel {
   id: ID!
   createdAt: DateTime!
@@ -38,6 +45,9 @@ type ContentModel {
   user: User!
   model: String!
   position: String!
+  ogMetaImage: ImageAsset
+  image: ImageAsset
+  imageNoConnections: ImageAsset
 }
 
 type PaginationInfo {

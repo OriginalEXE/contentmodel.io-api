@@ -43,32 +43,38 @@ model TeamUser {
 }
 
 model ContentModel {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  cms         String
-  slug        String
-  title       String
-  description String
-  user        User     @relation(fields: [userId], references: [id])
-  userId      String
-  team        Team?    @relation(fields: [teamId], references: [id])
-  teamId      String?
-  versions    ContentModelVersion[]
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  cms           String
+  slug          String   @unique
+  title         String
+  description   String
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  team          Team?    @relation(fields: [teamId], references: [id])
+  teamId        String?
+  ogMetaImage   CloudinaryAsset? @relation(fields: [ogMetaImageId], references: [id])
+  ogMetaImageId String?
+  versions      ContentModelVersion[]
 }
 
 model ContentModelVersion {
-  id             String       @id @default(uuid())
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  contentModel   ContentModel @relation(fields: [contentModelId], references: [id])
-  contentModelId String
-  name           String
-  version        Int
-  model          Json
-  position       Json
-  author         User         @relation(fields: [authorId], references: [id])
-  authorId       String
+  id                   String           @id @default(uuid())
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  contentModel         ContentModel     @relation(fields: [contentModelId], references: [id])
+  contentModelId       String
+  name                 String
+  version              Int
+  model                Json
+  position             Json
+  author               User             @relation(fields: [authorId], references: [id])
+  authorId             String
+  image                CloudinaryAsset? @relation("Image", fields: [imageId], references: [id])
+  imageId              String?
+  imageNoConnections   CloudinaryAsset? @relation("ImageNoConnections", fields: [imageNoConnectionsId], references: [id])
+  imageNoConnectionsId String?
 }
 
 model Tag {
@@ -88,6 +94,22 @@ model ContentModelTag {
   contentModelId String
   tag            Tag          @relation(fields: [tagId], references: [id])
   tagId          String
+}
+
+model CloudinaryAsset {
+  id                                    String               @id @default(uuid())
+  createdAt                             DateTime             @default(now())
+  updatedAt                             DateTime             @updatedAt
+  public_id                             String               @unique
+  version                               Int
+  signature                             String
+  width                                 Int?
+  height                                Int?
+  resource_type                         String
+  type                                  String
+  // Not actually used, here for Prisma's sake
+  imageContentModelVersion              ContentModelVersion? @relation("Image")
+  imageNoConnectionsContentModelVersion ContentModelVersion? @relation("ImageNoConnections")
 }
 
 generator client {

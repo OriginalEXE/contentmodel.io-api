@@ -23,9 +23,11 @@ import {
 import { GqlAuthNotRequiredGuard } from '../../auth/gql-auth-not-required.guard';
 import { GqlAuthGuard } from '../../auth/gql-auth.guard';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryAssetService } from '../cloudinary-asset/cloudinary-asset.service';
 import { User } from '../user/user.model';
 import { UserService } from '../user/user.service';
 import { ContentModel } from './content-model.model';
+import { ContentModelService } from './content-model.service';
 import normalizeContentModelPosition from './helpers/normalizeContentModelPosition';
 import { CreateContentModelInput } from './inputs/create-content-model.input';
 import { DeleteContentModelInput } from './inputs/delete-content-model.input';
@@ -33,6 +35,8 @@ import { UpdateContentModelInput } from './inputs/update-content-model.input';
 import { PaginatedContentModel } from './paginated-content-model.model';
 import parseContentModel from './parsers/parseContentModel';
 import parseContentModelPosition from './parsers/parseContentModelPosition';
+
+let DEV_GENERATING_DATA = false;
 
 const nanoid = customAlphabet(
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -44,6 +48,8 @@ export class ContentModelResolver {
   constructor(
     private userService: UserService,
     private prisma: PrismaService,
+    private contentModelService: ContentModelService,
+    private cloudinaryAssetService: CloudinaryAssetService,
   ) {}
 
   @Query(() => PaginatedContentModel)
@@ -58,6 +64,78 @@ export class ContentModelResolver {
     @Args('search', { type: () => String, nullable: true, defaultValue: '' })
     search: string,
   ): Promise<PaginatedContentModel> {
+    if (DEV_GENERATING_DATA === false) {
+      DEV_GENERATING_DATA = true;
+
+      const [, contentModels] = await catchify(
+        this.prisma.contentModel.findMany({
+          orderBy: {
+            createdAt: 'desc' as const,
+          },
+          skip: 0,
+          take: 100,
+          include: {
+            versions: {
+              orderBy: {
+                version: 'desc' as const,
+              },
+              take: 1,
+              include: {
+                image: true,
+                imageNoConnections: true,
+              },
+            },
+            user: true,
+            ogMetaImage: true,
+          },
+        }),
+      );
+
+      contentModels.forEach((contentModel) => {
+        this.contentModelService.generateContentModelScreenshots({
+          ...contentModel,
+          model: JSON.stringify(contentModel.versions[0].model),
+          position: JSON.stringify(contentModel.versions[0].position),
+          ogMetaImage: contentModel.ogMetaImage
+            ? {
+                width: contentModel.ogMetaImage.width,
+                height: contentModel.ogMetaImage.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.ogMetaImage,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.ogMetaImage,
+                ),
+              }
+            : null,
+          image: contentModel.versions[0].image
+            ? {
+                width: contentModel.versions[0].image.width,
+                height: contentModel.versions[0].image.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.versions[0].image,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.versions[0].image,
+                ),
+              }
+            : null,
+          imageNoConnections: contentModel.versions[0].imageNoConnections
+            ? {
+                width: contentModel.versions[0].imageNoConnections.width,
+                height: contentModel.versions[0].imageNoConnections.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.versions[0].imageNoConnections,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.versions[0].imageNoConnections,
+                ),
+              }
+            : null,
+        });
+      });
+    }
+
     const paginationCount = Math.min(1000, Math.max(1, count));
     const paginationPage = Math.max(1, page);
 
@@ -73,8 +151,13 @@ export class ContentModelResolver {
             version: 'desc' as const,
           },
           take: 1,
+          include: {
+            image: true,
+            imageNoConnections: true,
+          },
         },
         user: true,
+        ogMetaImage: true,
       },
       where: {},
     };
@@ -133,6 +216,42 @@ export class ContentModelResolver {
           ...contentModel,
           model: JSON.stringify(contentModel.versions[0].model),
           position: JSON.stringify(contentModel.versions[0].position),
+          ogMetaImage: contentModel.ogMetaImage
+            ? {
+                width: contentModel.ogMetaImage.width,
+                height: contentModel.ogMetaImage.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.ogMetaImage,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.ogMetaImage,
+                ),
+              }
+            : null,
+          image: contentModel.versions[0].image
+            ? {
+                width: contentModel.versions[0].image.width,
+                height: contentModel.versions[0].image.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.versions[0].image,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.versions[0].image,
+                ),
+              }
+            : null,
+          imageNoConnections: contentModel.versions[0].imageNoConnections
+            ? {
+                width: contentModel.versions[0].imageNoConnections.width,
+                height: contentModel.versions[0].imageNoConnections.height,
+                src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                  contentModel.versions[0].imageNoConnections,
+                ),
+                path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                  contentModel.versions[0].imageNoConnections,
+                ),
+              }
+            : null,
         };
 
         return contentModelWithVersion;
@@ -162,8 +281,13 @@ export class ContentModelResolver {
               version: 'desc' as const,
             },
             take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
           },
           user: true,
+          ogMetaImage: true,
         },
       }),
     );
@@ -181,6 +305,42 @@ export class ContentModelResolver {
       ...contentModels[0],
       model: JSON.stringify(contentModels[0].versions[0].model),
       position: JSON.stringify(contentModels[0].versions[0].position),
+      ogMetaImage: contentModels[0].ogMetaImage
+        ? {
+            width: contentModels[0].ogMetaImage.width,
+            height: contentModels[0].ogMetaImage.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModels[0].ogMetaImage,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModels[0].ogMetaImage,
+            ),
+          }
+        : null,
+      image: contentModels[0].versions[0].image
+        ? {
+            width: contentModels[0].versions[0].image.width,
+            height: contentModels[0].versions[0].image.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModels[0].versions[0].image,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModels[0].versions[0].image,
+            ),
+          }
+        : null,
+      imageNoConnections: contentModels[0].versions[0].imageNoConnections
+        ? {
+            width: contentModels[0].versions[0].imageNoConnections.width,
+            height: contentModels[0].versions[0].imageNoConnections.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModels[0].versions[0].imageNoConnections,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModels[0].versions[0].imageNoConnections,
+            ),
+          }
+        : null,
     };
   }
 
@@ -303,11 +463,19 @@ export class ContentModelResolver {
       throw new InternalServerErrorException('Something went wrong');
     }
 
-    return {
+    const newContentModel = {
       ...createdContentModel,
       model: JSON.stringify(createdContentModel.versions[0].model),
       position: JSON.stringify(createdContentModel.versions[0].position),
+      ogMetaImage: null,
+      image: null,
+      imageNoConnections: null,
     };
+
+    // Generate content model screenshots
+    this.contentModelService.generateContentModelScreenshots(newContentModel);
+
+    return newContentModel;
   }
 
   @Mutation(() => ContentModel)
@@ -395,6 +563,8 @@ export class ContentModelResolver {
           ) === false
         ? true
         : false;
+    const isNewTitle =
+      title !== undefined && title.trim() !== contentModelInDb.title;
 
     const [updatedContentModelError, updatedContentModel] = await catchify(
       this.prisma.contentModel.update({
@@ -480,8 +650,13 @@ export class ContentModelResolver {
               version: 'desc' as const,
             },
             take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
           },
           user: true,
+          ogMetaImage: true,
         },
       }),
     );
@@ -491,11 +666,89 @@ export class ContentModelResolver {
       throw new InternalServerErrorException('Something went wrong');
     }
 
-    return {
+    const newContentModel = {
       ...updatedContentModel,
       model: JSON.stringify(updatedContentModel.versions[0].model),
       position: JSON.stringify(updatedContentModel.versions[0].position),
+      ogMetaImage: updatedContentModel.ogMetaImage
+        ? {
+            width: updatedContentModel.ogMetaImage.width,
+            height: updatedContentModel.ogMetaImage.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              updatedContentModel.ogMetaImage,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              updatedContentModel.ogMetaImage,
+            ),
+          }
+        : null,
+      image: updatedContentModel.versions[0].image
+        ? {
+            width: updatedContentModel.versions[0].image.width,
+            height: updatedContentModel.versions[0].image.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              updatedContentModel.versions[0].image,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              updatedContentModel.versions[0].image,
+            ),
+          }
+        : null,
+      imageNoConnections: updatedContentModel.versions[0].imageNoConnections
+        ? {
+            width: updatedContentModel.versions[0].imageNoConnections.width,
+            height: updatedContentModel.versions[0].imageNoConnections.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              updatedContentModel.versions[0].imageNoConnections,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              updatedContentModel.versions[0].imageNoConnections,
+            ),
+          }
+        : null,
     };
+
+    if (isNewContentModel === true) {
+      // Generate content model screenshots
+      this.contentModelService.generateContentModelScreenshots(
+        newContentModel,
+        {
+          metaImagePublicId: updatedContentModel.ogMetaImage
+            ? updatedContentModel.ogMetaImage.public_id
+            : undefined,
+        },
+      );
+    } else if (isNewPosition === true) {
+      // Generate content model screenshots, replace old versions
+      this.contentModelService.generateContentModelScreenshots(
+        newContentModel,
+        {
+          metaImagePublicId: updatedContentModel.ogMetaImage
+            ? updatedContentModel.ogMetaImage.public_id
+            : undefined,
+          contentModelImagePublicId: updatedContentModel.versions[0].image
+            ? updatedContentModel.versions[0].image.public_id
+            : undefined,
+          contentModelNoConnectionsImagePublicId: updatedContentModel
+            .versions[0].imageNoConnections
+            ? updatedContentModel.versions[0].imageNoConnections.public_id
+            : undefined,
+        },
+      );
+    } else if (isNewTitle === true) {
+      // Title changed, generate only meta image
+      this.contentModelService.generateContentModelScreenshots(
+        newContentModel,
+        {
+          metaImagePublicId: updatedContentModel.ogMetaImage
+            ? updatedContentModel.ogMetaImage.public_id
+            : undefined,
+          generateContentModelScreenshots: false,
+        },
+      );
+    }
+
+    return newContentModel;
   }
 
   @Mutation(() => ContentModel)
@@ -519,8 +772,13 @@ export class ContentModelResolver {
               version: 'desc' as const,
             },
             take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
           },
           user: true,
+          ogMetaImage: true,
         },
       }),
     );
@@ -562,6 +820,42 @@ export class ContentModelResolver {
       ...contentModelInDb,
       model: JSON.stringify(contentModelInDb.versions[0].model),
       position: JSON.stringify(contentModelInDb.versions[0].position),
+      ogMetaImage: contentModelInDb.ogMetaImage
+        ? {
+            width: contentModelInDb.ogMetaImage.width,
+            height: contentModelInDb.ogMetaImage.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.ogMetaImage,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.ogMetaImage,
+            ),
+          }
+        : null,
+      image: contentModelInDb.versions[0].image
+        ? {
+            width: contentModelInDb.versions[0].image.width,
+            height: contentModelInDb.versions[0].image.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].image,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].image,
+            ),
+          }
+        : null,
+      imageNoConnections: contentModelInDb.versions[0].imageNoConnections
+        ? {
+            width: contentModelInDb.versions[0].imageNoConnections.width,
+            height: contentModelInDb.versions[0].imageNoConnections.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+          }
+        : null,
     };
   }
 }
