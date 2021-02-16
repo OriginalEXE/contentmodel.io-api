@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import catchify from 'catchify';
 import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
-import pw from 'playwright';
+import puppeteer from 'puppeteer';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { ContentModel } from './content-model.model';
@@ -72,23 +72,22 @@ export class ContentModelService {
       return;
     }
 
-    const playwrightRemote = this.configService.get<null | string>(
-      'app.playwright',
+    const puppeteerRemote = this.configService.get<null | string>(
+      'app.puppeteer',
     );
     const frontendUrl = this.configService.get<string>('app.frontendUrl');
 
-    let browser: pw.ChromiumBrowser;
+    let browser: puppeteer.Browser;
 
     try {
       browser =
-        playwrightRemote === null
-          ? await pw.chromium.launch()
-          : await pw.chromium.connect({
-              wsEndpoint: playwrightRemote,
+        puppeteerRemote === null
+          ? await puppeteer.launch()
+          : await puppeteer.connect({
+              browserWSEndpoint: puppeteerRemote,
             });
 
-      let context = await browser.newContext();
-      let page = await context.newPage();
+      let page = await browser.newPage();
 
       const cloudinaryScreenshotsFolderBase = this.configService.get<string>(
         'app.cloudinaryScreenshotsFolderBase',
@@ -96,7 +95,7 @@ export class ContentModelService {
 
       // OG Meta screenshot
       if (screenshotOptions.generateMetaImage === true) {
-        await page.setViewportSize({
+        await page.setViewport({
           width: 1200,
           height: 627,
         });
@@ -106,6 +105,8 @@ export class ContentModelService {
         );
         await page.waitForSelector('.is-fully-drawn');
         const ogMetaScreenshotBuffer = await page.screenshot();
+
+        console.log('Screenshot:', ogMetaScreenshotBuffer);
 
         const ogMetaScreenshotUpload = await new Promise<UploadApiResponse>(
           (resolve, reject) => {
@@ -181,9 +182,7 @@ export class ContentModelService {
         );
 
         // First we calculate the ideal viewport size
-        const contentmodelio = await page.waitForFunction<{
-          dimensions: ContentModelDimensions;
-        }>(
+        const contentmodelio = await page.waitForFunction(
           () => {
             return typeof (window as any).contentmodelio !== undefined
               ? (window as any).contentmodelio
@@ -194,23 +193,22 @@ export class ContentModelService {
             polling: 200,
           },
         );
-        const { dimensions } = await contentmodelio.jsonValue();
+        const { dimensions } = await contentmodelio.jsonValue<{
+          dimensions: ContentModelDimensions;
+        }>();
 
-        await context.close();
+        await page.close();
 
-        context = await browser.newContext({
-          viewport: {
-            width:
-              dimensions.totalContentTypesWidth +
-              DIAGRAM_INITIAL_DRAW_PADDING * 2,
-            height:
-              dimensions.totalContentTypesHeight +
-              DIAGRAM_INITIAL_DRAW_PADDING * 2,
-          },
+        page = await browser.newPage();
+        page.setViewport({
+          width:
+            dimensions.totalContentTypesWidth +
+            DIAGRAM_INITIAL_DRAW_PADDING * 2,
+          height:
+            dimensions.totalContentTypesHeight +
+            DIAGRAM_INITIAL_DRAW_PADDING * 2,
           deviceScaleFactor: 2,
         });
-
-        page = await context.newPage();
 
         // Screenshot with connections
         await page.goto(

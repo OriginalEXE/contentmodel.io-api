@@ -5,6 +5,7 @@ export default registerAs('app', () => ({
   host: process.env.HOST ?? 'localhost',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   playwright: process.env.REMOTE_PLAYWRIGHT ?? null,
+  puppeteer: process.env.REMOTE_PUPPETEER ?? null,
   cloudinaryUrl: process.env.CLOUDINARY_URL ?? null,
   cloudinaryScreenshotsFolderBase:
     process.env.NODE_ENV === 'production'
