@@ -106,8 +106,6 @@ export class ContentModelService {
         await page.waitForSelector('.is-fully-drawn');
         const ogMetaScreenshotBuffer = await page.screenshot();
 
-        console.log('Screenshot:', ogMetaScreenshotBuffer);
-
         const ogMetaScreenshotUpload = await new Promise<UploadApiResponse>(
           (resolve, reject) => {
             cloudinary.uploader
