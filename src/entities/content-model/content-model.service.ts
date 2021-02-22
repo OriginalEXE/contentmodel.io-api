@@ -76,6 +76,9 @@ export class ContentModelService {
       'app.puppeteer',
     );
     const frontendUrl = this.configService.get<string>('app.frontendUrl');
+    const privateContentModelScreenshotSecret = this.configService.get<string>(
+      'app.privateContentModelScreenshotSecret',
+    );
 
     let browser: puppeteer.Browser;
 
@@ -89,6 +92,17 @@ export class ContentModelService {
 
       let page = await browser.newPage();
 
+      // Don't load analytics script
+      await page.setRequestInterception(true);
+
+      page.on('request', (interceptedRequest) => {
+        if (interceptedRequest.url().endsWith('plausible.js')) {
+          interceptedRequest.abort();
+        } else {
+          interceptedRequest.continue();
+        }
+      });
+
       const cloudinaryScreenshotsFolderBase = this.configService.get<string>(
         'app.cloudinaryScreenshotsFolderBase',
       );
@@ -101,7 +115,7 @@ export class ContentModelService {
         });
 
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/preview-image`,
+          `${frontendUrl}/content-models/${contentModel.slug}/preview-image?secret=${privateContentModelScreenshotSecret}`,
         );
         await page.waitForSelector('.is-fully-drawn');
         const ogMetaScreenshotBuffer = await page.screenshot();
@@ -176,7 +190,7 @@ export class ContentModelService {
       // Content model screenshots
       if (screenshotOptions.generateContentModelScreenshots === true) {
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed`,
+          `${frontendUrl}/content-models/${contentModel.slug}/embed?secret=${privateContentModelScreenshotSecret}`,
         );
 
         // First we calculate the ideal viewport size
@@ -210,7 +224,7 @@ export class ContentModelService {
 
         // Screenshot with connections
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0`,
+          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0&secret=${privateContentModelScreenshotSecret}`,
         );
         await page.waitForSelector('.is-fully-drawn');
 
@@ -243,7 +257,7 @@ export class ContentModelService {
 
         // Screenshot without connections
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0&drawConnections=0`,
+          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0&drawConnections=0&secret=${privateContentModelScreenshotSecret}`,
         );
         await page.waitForSelector('.is-fully-drawn');
 

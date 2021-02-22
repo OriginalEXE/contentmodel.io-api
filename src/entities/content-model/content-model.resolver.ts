@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   Query,
   Mutation,
@@ -12,6 +13,7 @@ import {
   Parent,
   Int,
 } from '@nestjs/graphql';
+import { Prisma } from '@prisma/client';
 import catchify from 'catchify';
 import { isEqual } from 'lodash';
 import { customAlphabet } from 'nanoid';
@@ -35,6 +37,7 @@ import { UpdateContentModelInput } from './inputs/update-content-model.input';
 import { PaginatedContentModel } from './paginated-content-model.model';
 import parseContentModel from './parsers/parseContentModel';
 import parseContentModelPosition from './parsers/parseContentModelPosition';
+import parseContentModelVisibility from './parsers/parseContentModelVisibility';
 
 const nanoid = customAlphabet(
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -48,73 +51,135 @@ export class ContentModelResolver {
     private prisma: PrismaService,
     private contentModelService: ContentModelService,
     private cloudinaryAssetService: CloudinaryAssetService,
+    private configService: ConfigService,
   ) {}
 
   @Query(() => PaginatedContentModel)
   @UseGuards(GqlAuthNotRequiredGuard)
   async contentModels(
+    @AccessTokenEntity() accessToken: AccessToken | false,
     @Args('count', { type: () => Int, nullable: true, defaultValue: 20 })
     count: number,
     @Args('page', { type: () => Int, nullable: true, defaultValue: 1 })
     page: number,
-    @Args('user', { type: () => String, nullable: true, defaultValue: '' })
+    @Args('user', {
+      type: () => String,
+      nullable: true,
+      defaultValue: '',
+    })
     user: string,
     @Args('search', { type: () => String, nullable: true, defaultValue: '' })
     search: string,
+    @Args('visibility', {
+      type: () => String,
+      nullable: true,
+    })
+    visibility: string,
   ): Promise<PaginatedContentModel> {
+    const currentUser =
+      accessToken === false
+        ? null
+        : await this.userService.getUserByAuth0Id({
+            auth0Id: accessToken.sub,
+          });
+
     const paginationCount = Math.min(1000, Math.max(1, count));
     const paginationPage = Math.max(1, page);
 
-    const queryArgs = {
-      orderBy: {
-        createdAt: 'desc' as const,
-      },
-      skip: paginationPage * paginationCount - paginationCount,
-      take: paginationCount,
-      include: {
-        versions: {
-          orderBy: {
-            version: 'desc' as const,
-          },
-          take: 1,
-          include: {
-            image: true,
-            imageNoConnections: true,
-          },
+    let parsedContentModelVisibility:
+      | ReturnType<typeof parseContentModelVisibility>
+      | undefined;
+
+    if (visibility !== null) {
+      parsedContentModelVisibility = parseContentModelVisibility(visibility);
+
+      if (parsedContentModelVisibility.success === false) {
+        throw new BadRequestException(parsedContentModelVisibility.error);
+      }
+    }
+
+    const visibilityFilter =
+      parsedContentModelVisibility === undefined
+        ? undefined
+        : parsedContentModelVisibility.success === true
+        ? parsedContentModelVisibility.data
+        : undefined;
+    const isNonPublicFilter =
+      visibilityFilter !== undefined && visibilityFilter !== 'PUBLIC';
+
+    if (isNonPublicFilter === true && currentUser === null) {
+      return {
+        items: [],
+        pagination: {
+          hasNext: false,
+          hasPrev: false,
+          total: 0,
         },
-        user: true,
-        ogMetaImage: true,
-      },
-      where: {},
+      };
+    }
+
+    const visibilityAffectedUserFilter =
+      isNonPublicFilter === true ? currentUser.id : undefined;
+
+    const queryWhere: Prisma.ContentModelWhereInput = {
+      AND: [
+        // Visibility
+        {
+          visibility: visibilityFilter,
+          userId: visibilityAffectedUserFilter,
+        },
+
+        // Filter by user
+        {
+          userId: user === '' ? undefined : user,
+        },
+
+        // Search
+        {
+          OR:
+            search.trim() === ''
+              ? undefined
+              : [
+                  {
+                    title: {
+                      contains: search.trim(),
+                      mode: 'insensitive',
+                    },
+                    description: {
+                      contains: search.trim(),
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+        },
+      ],
     };
 
-    if (search.trim() !== '') {
-      queryArgs.where = {
-        OR: [
-          {
-            title: {
-              contains: search.trim(),
-              mode: 'insensitive',
-            },
-            description: {
-              contains: search.trim(),
-              mode: 'insensitive',
-            },
-          },
-        ],
-        ...queryArgs.where,
-      };
-    }
-
-    if (user !== '') {
-      queryArgs.where = {
-        ...queryArgs.where,
-        AND: [{ userId: user }],
-      };
-    }
+    const skip = paginationPage * paginationCount - paginationCount;
 
     const [contentModelsError, contentModels] = await catchify(
-      this.prisma.contentModel.findMany(queryArgs),
+      this.prisma.contentModel.findMany({
+        orderBy: {
+          createdAt: 'desc' as const,
+        },
+        skip,
+        take: paginationCount,
+        include: {
+          versions: {
+            orderBy: {
+              version: 'desc' as const,
+            },
+            take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
+          },
+          user: true,
+          ogMetaImage: true,
+        },
+        where: queryWhere,
+      }),
     );
 
     if (contentModelsError !== null) {
@@ -124,7 +189,7 @@ export class ContentModelResolver {
 
     const [contentModelsCountError, contentModelsCount] = await catchify(
       this.prisma.contentModel.count({
-        where: queryArgs.where,
+        where: queryWhere,
       }),
     );
 
@@ -133,8 +198,8 @@ export class ContentModelResolver {
       throw new InternalServerErrorException('Something went wrong');
     }
 
-    const hasPrev = queryArgs.skip !== 0;
-    const hasNext = contentModelsCount > queryArgs.take * paginationPage;
+    const hasPrev = skip !== 0;
+    const hasNext = contentModelsCount > paginationCount * paginationPage;
 
     return {
       items: contentModels.map((contentModel) => {
@@ -193,11 +258,21 @@ export class ContentModelResolver {
   @Query(() => ContentModel, { nullable: true })
   @UseGuards(GqlAuthNotRequiredGuard)
   async contentModelBySlug(
+    @AccessTokenEntity() accessToken: AccessToken | false,
     @Args('slug', { type: () => String })
     slug: string,
+    @Args('secret', { type: () => String, nullable: true, defaultValue: '' })
+    secret: string,
   ): Promise<ContentModel> {
-    const [contentModelsError, contentModels] = await catchify(
-      this.prisma.contentModel.findMany({
+    const currentUser =
+      accessToken === false
+        ? null
+        : await this.userService.getUserByAuth0Id({
+            auth0Id: accessToken.sub,
+          });
+
+    const [contentModelError, contentModel] = await catchify(
+      this.prisma.contentModel.findUnique({
         where: {
           slug,
         },
@@ -218,52 +293,69 @@ export class ContentModelResolver {
       }),
     );
 
-    if (contentModelsError !== null) {
-      console.error(contentModelsError);
+    if (contentModelError !== null) {
+      console.error(contentModelError);
       throw new InternalServerErrorException('Something went wrong');
     }
 
-    if (contentModels.length === 0) {
+    if (contentModel === null) {
       return null;
     }
 
+    const privateContentModelScreenshotSecret = this.configService.get<string>(
+      'app.privateContentModelScreenshotSecret',
+    );
+
+    if (
+      contentModel.visibility === 'PRIVATE' &&
+      secret !== privateContentModelScreenshotSecret
+    ) {
+      if (currentUser === null) {
+        return null;
+      }
+
+      if (contentModel.user.id !== currentUser.id) {
+        return null;
+      }
+    }
+
     return {
-      ...contentModels[0],
-      model: JSON.stringify(contentModels[0].versions[0].model),
-      position: JSON.stringify(contentModels[0].versions[0].position),
-      ogMetaImage: contentModels[0].ogMetaImage
+      ...contentModel,
+      model: JSON.stringify(contentModel.versions[0].model),
+      position: JSON.stringify(contentModel.versions[0].position),
+      ogMetaImage: contentModel.ogMetaImage
         ? {
-            width: contentModels[0].ogMetaImage.width,
-            height: contentModels[0].ogMetaImage.height,
+            width: contentModel.ogMetaImage.width,
+            height: contentModel.ogMetaImage.height,
             src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-              contentModels[0].ogMetaImage,
+              contentModel.ogMetaImage,
             ),
             path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-              contentModels[0].ogMetaImage,
+              contentModel.ogMetaImage,
             ),
           }
         : null,
-      image: contentModels[0].versions[0].image
+      image: contentModel.versions[0].image
         ? {
-            width: contentModels[0].versions[0].image.width,
-            height: contentModels[0].versions[0].image.height,
+            width: contentModel.versions[0].image.width,
+            height: contentModel.versions[0].image.height,
             src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-              contentModels[0].versions[0].image,
+              contentModel.versions[0].image,
             ),
             path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-              contentModels[0].versions[0].image,
+              contentModel.versions[0].image,
             ),
           }
         : null,
-      imageNoConnections: contentModels[0].versions[0].imageNoConnections
+      imageNoConnections: contentModel.versions[0].imageNoConnections
         ? {
-            width: contentModels[0].versions[0].imageNoConnections.width,
-            height: contentModels[0].versions[0].imageNoConnections.height,
+            width: contentModel.versions[0].imageNoConnections.width,
+            height: contentModel.versions[0].imageNoConnections.height,
             src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
-              contentModels[0].versions[0].imageNoConnections,
+              contentModel.versions[0].imageNoConnections,
             ),
             path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
-              contentModels[0].versions[0].imageNoConnections,
+              contentModel.versions[0].imageNoConnections,
             ),
           }
         : null,
@@ -320,7 +412,12 @@ export class ContentModelResolver {
       auth0Id: accessToken.sub,
     });
 
-    const { title, description, version } = createContentModel;
+    const {
+      title,
+      description,
+      version,
+      visibility = 'PUBLIC',
+    } = createContentModel;
 
     if (title.length === 0) {
       throw new BadRequestException('Title is required');
@@ -344,6 +441,14 @@ export class ContentModelResolver {
       throw new BadRequestException(parsedContentModelPosition.error);
     }
 
+    const parsedContentModelVisibility = parseContentModelVisibility(
+      visibility,
+    );
+
+    if (parsedContentModelVisibility.success === false) {
+      throw new BadRequestException(parsedContentModelVisibility.error);
+    }
+
     const [createdContentModelError, createdContentModel] = await catchify(
       this.prisma.contentModel.create({
         data: {
@@ -351,6 +456,7 @@ export class ContentModelResolver {
           title: title.trim(),
           description: description.trim(),
           cms: 'contentful',
+          visibility: parsedContentModelVisibility.data,
           versions: {
             create: {
               name: title.trim(),
@@ -414,7 +520,7 @@ export class ContentModelResolver {
       auth0Id: accessToken.sub,
     });
 
-    const { id, title, description, version } = updateContentModel;
+    const { id, title, description, visibility, version } = updateContentModel;
 
     const [contentModelInDbError, contentModelInDb] = await catchify(
       this.prisma.contentModel.findUnique({
@@ -469,6 +575,18 @@ export class ContentModelResolver {
       }
     }
 
+    let parsedContentModelVisibility:
+      | ReturnType<typeof parseContentModelVisibility>
+      | undefined;
+
+    if (visibility !== undefined) {
+      parsedContentModelVisibility = parseContentModelVisibility(visibility);
+
+      if (parsedContentModelVisibility.success === false) {
+        throw new BadRequestException(parsedContentModelVisibility.error);
+      }
+    }
+
     const isNewContentModel =
       version === undefined || version.model === undefined
         ? false
@@ -499,6 +617,12 @@ export class ContentModelResolver {
           title: title === undefined ? undefined : title.trim(),
           description:
             description === undefined ? undefined : description.trim(),
+          visibility:
+            visibility === undefined
+              ? undefined
+              : parsedContentModelVisibility.success === true
+              ? parsedContentModelVisibility.data
+              : undefined,
           versions:
             version === undefined
               ? undefined

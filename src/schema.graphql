@@ -45,6 +45,7 @@ type ContentModel {
   user: User!
   model: String!
   position: String!
+  visibility: String!
   ogMetaImage: ImageAsset
   image: ImageAsset
   imageNoConnections: ImageAsset
@@ -63,8 +64,8 @@ type PaginatedContentModel {
 
 type Query {
   me: User
-  contentModels(search: String = "", user: String = "", page: Int = 1, count: Int = 20): PaginatedContentModel!
-  contentModelBySlug(slug: String!): ContentModel
+  contentModels(visibility: String, search: String = "", user: String = "", page: Int = 1, count: Int = 20): PaginatedContentModel!
+  contentModelBySlug(secret: String = "", slug: String!): ContentModel
 }
 
 type Mutation {
@@ -89,6 +90,7 @@ input UpdateUserInput {
 input CreateContentModelInput {
   title: String!
   description: String!
+  visibility: String
   version: CreateContentModelVersionInput!
 }
 
@@ -101,6 +103,7 @@ input UpdateContentModelInput {
   id: String!
   title: String
   description: String
+  visibility: String
   version: UpdateContentModelVersionInput
 }
 

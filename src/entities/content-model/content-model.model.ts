@@ -30,6 +30,9 @@ export class ContentModel extends Model {
   @Field(() => String)
   position: string;
 
+  @Field(() => String)
+  visibility: 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+
   @Field(() => ImageAsset, { nullable: true })
   ogMetaImage: ImageAsset;
 

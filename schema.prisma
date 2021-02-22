@@ -42,21 +42,28 @@ model TeamUser {
   role      String
 }
 
+enum ContentModelVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
 model ContentModel {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            String                 @id @default(uuid())
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   cms           String
-  slug          String   @unique
+  slug          String                 @unique
   title         String
   description   String
-  user          User     @relation(fields: [userId], references: [id])
+  user          User                   @relation(fields: [userId], references: [id])
   userId        String
-  team          Team?    @relation(fields: [teamId], references: [id])
+  team          Team?                  @relation(fields: [teamId], references: [id])
   teamId        String?
-  ogMetaImage   CloudinaryAsset? @relation(fields: [ogMetaImageId], references: [id])
+  ogMetaImage   CloudinaryAsset?       @relation(fields: [ogMetaImageId], references: [id])
   ogMetaImageId String?
   versions      ContentModelVersion[]
+  visibility    ContentModelVisibility @default(PUBLIC)
 }
 
 model ContentModelVersion {

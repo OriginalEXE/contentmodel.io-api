@@ -10,5 +10,6 @@ class CreateContentModelVersionInput {
 export class CreateContentModelInput {
   @Field() title: string;
   @Field() description: string;
+  @Field({ nullable: true }) visibility?: string;
   @Field() version: CreateContentModelVersionInput;
 }

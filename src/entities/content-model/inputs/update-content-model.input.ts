@@ -11,5 +11,6 @@ export class UpdateContentModelInput {
   @Field() id: string;
   @Field({ nullable: true }) title?: string;
   @Field({ nullable: true }) description?: string;
+  @Field({ nullable: true }) visibility?: string;
   @Field({ nullable: true }) version?: UpdateContentModelVersionInput;
 }
