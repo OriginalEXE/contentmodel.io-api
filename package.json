@@ -9,7 +9,7 @@
     "start": "nest start",
     "dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node --max-http-header-size=16384 dist/main",
     "generate": "npm -s run generate:prisma",
     "generate:prisma": "prisma generate",
     "lint": "tslint -p tsconfig.json -c tslint.json"
