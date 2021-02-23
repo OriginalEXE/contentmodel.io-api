@@ -4,11 +4,7 @@ module.exports = {
     node: true,
   },
   parser: '@typescript-eslint/parser',
-  extends: [
-    'plugin:@typescript-eslint/recommended',
-    'prettier',
-    'prettier/@typescript-eslint',
-  ],
+  extends: ['plugin:@typescript-eslint/recommended', 'prettier'],
   rules: {
     indent: 'off',
     'linebreak-style': 0,
