@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import catchify from 'catchify';
 import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 import puppeteer from 'puppeteer';
+import queryString from 'query-string';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { ContentModel } from './content-model.model';
@@ -115,7 +116,12 @@ export class ContentModelService {
         });
 
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/preview-image?secret=${privateContentModelScreenshotSecret}`,
+          queryString.stringifyUrl({
+            url: `${frontendUrl}/content-models/${contentModel.slug}/preview-image`,
+            query: {
+              secret: privateContentModelScreenshotSecret,
+            },
+          }),
         );
         await page.waitForSelector('.is-fully-drawn');
         const ogMetaScreenshotBuffer = await page.screenshot();
@@ -190,7 +196,12 @@ export class ContentModelService {
       // Content model screenshots
       if (screenshotOptions.generateContentModelScreenshots === true) {
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed?secret=${privateContentModelScreenshotSecret}`,
+          queryString.stringifyUrl({
+            url: `${frontendUrl}/content-models/${contentModel.slug}/embed`,
+            query: {
+              secret: privateContentModelScreenshotSecret,
+            },
+          }),
         );
 
         // First we calculate the ideal viewport size
@@ -224,7 +235,14 @@ export class ContentModelService {
 
         // Screenshot with connections
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0&secret=${privateContentModelScreenshotSecret}`,
+          queryString.stringifyUrl({
+            url: `${frontendUrl}/content-models/${contentModel.slug}/embed`,
+            query: {
+              secret: privateContentModelScreenshotSecret,
+              animatedAppearance: 0,
+              showControls: 0,
+            },
+          }),
         );
         await page.waitForSelector('.is-fully-drawn');
 
@@ -257,7 +275,15 @@ export class ContentModelService {
 
         // Screenshot without connections
         await page.goto(
-          `${frontendUrl}/content-models/${contentModel.slug}/embed?animatedAppearance=0&showControls=0&drawConnections=0&secret=${privateContentModelScreenshotSecret}`,
+          queryString.stringifyUrl({
+            url: `${frontendUrl}/content-models/${contentModel.slug}/embed`,
+            query: {
+              secret: privateContentModelScreenshotSecret,
+              animatedAppearance: 0,
+              showControls: 0,
+              drawConnections: 0,
+            },
+          }),
         );
         await page.waitForSelector('.is-fully-drawn');
 
