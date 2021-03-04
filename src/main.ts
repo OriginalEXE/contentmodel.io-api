@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import * as bodyParser from 'body-parser';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -20,6 +21,10 @@ async function bootstrap() {
           }
         : undefined,
   });
+
+  // Increase default body parser limits
+  app.use(bodyParser.json({ limit: '1mb' }));
+  app.use(bodyParser.urlencoded({ limit: '1mb', extended: true }));
 
   app.enableCors({
     credentials: true,
