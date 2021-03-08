@@ -4,14 +4,17 @@ datasource db {
 }
 
 model User {
-  id                    String   @id @default(uuid())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  email                 String   @unique
+  id                    String                @id @default(uuid())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  email                 String                @unique
   name                  String
   picture               String
   contentful_token_read String?
   logins                Login[]
+  TeamUser              TeamUser[]
+  ContentModel          ContentModel[]
+  ContentModelVersion   ContentModelVersion[]
 }
 
 model Login {
@@ -24,11 +27,13 @@ model Login {
 }
 
 model Team {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  name      String
-  slug      String   @unique
+  id           String         @id @default(uuid())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  name         String
+  slug         String         @unique
+  TeamUser     TeamUser[]
+  ContentModel ContentModel[]
 }
 
 model TeamUser {
@@ -49,21 +54,24 @@ enum ContentModelVisibility {
 }
 
 model ContentModel {
-  id            String                 @id @default(uuid())
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  cms           String
-  slug          String                 @unique
-  title         String
-  description   String
-  user          User                   @relation(fields: [userId], references: [id])
-  userId        String
-  team          Team?                  @relation(fields: [teamId], references: [id])
-  teamId        String?
-  ogMetaImage   CloudinaryAsset?       @relation(fields: [ogMetaImageId], references: [id])
-  ogMetaImageId String?
-  versions      ContentModelVersion[]
-  visibility    ContentModelVisibility @default(PUBLIC)
+  id              String                 @id @default(uuid())
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  cms             String
+  slug            String                 @unique
+  title           String
+  description     String
+  user            User                   @relation(fields: [userId], references: [id])
+  userId          String
+  team            Team?                  @relation(fields: [teamId], references: [id])
+  teamId          String?
+  ogMetaImage     CloudinaryAsset?       @relation(fields: [ogMetaImageId], references: [id])
+  ogMetaImageId   String?
+  versions        ContentModelVersion[]
+  visibility      ContentModelVisibility @default(PUBLIC)
+  Tag             Tag?                   @relation(fields: [tagId], references: [id])
+  tagId           String?
+  ContentModelTag ContentModelTag[]
 }
 
 model ContentModelVersion {
@@ -85,12 +93,13 @@ model ContentModelVersion {
 }
 
 model Tag {
-  id            String         @id @default(uuid())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  title         String
-  slug          String         @unique
-  contentModels ContentModel[]
+  id              String            @id @default(uuid())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  title           String
+  slug            String            @unique
+  contentModels   ContentModel[]
+  ContentModelTag ContentModelTag[]
 }
 
 model ContentModelTag {
@@ -117,6 +126,7 @@ model CloudinaryAsset {
   // Not actually used, here for Prisma's sake
   imageContentModelVersion              ContentModelVersion? @relation("Image")
   imageNoConnectionsContentModelVersion ContentModelVersion? @relation("ImageNoConnections")
+  ContentModel                          ContentModel[]
 }
 
 generator client {
