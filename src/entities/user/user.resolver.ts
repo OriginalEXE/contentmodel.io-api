@@ -90,6 +90,9 @@ export class UserResolver {
               id: userInDb.id,
             },
           },
+          include: {
+            user: true,
+          },
         }),
       );
 
@@ -139,11 +142,17 @@ export class UserResolver {
           auth0Id: accessToken.sub,
           user: {
             create: {
-              name: name.trim(),
+              name:
+                isEmail(name.trim()) === true
+                  ? name.trim().split('@')[0]
+                  : name.trim(),
               email,
               picture,
             },
           },
+        },
+        include: {
+          user: true,
         },
       }),
     );
@@ -168,7 +177,7 @@ export class UserResolver {
       auth0Id: accessToken.sub,
     });
 
-    const { id, contentful_token_read } = updateUser;
+    const { id, name, contentful_token_read } = updateUser;
 
     if (user.id !== id) {
       throw new BadRequestException('Could not find the user');
@@ -178,6 +187,7 @@ export class UserResolver {
       this.prisma.user.update({
         where: { id },
         data: {
+          name: name === undefined ? undefined : name.trim(),
           contentful_token_read,
         },
       }),

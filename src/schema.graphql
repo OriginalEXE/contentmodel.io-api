@@ -85,6 +85,7 @@ input CreateUserInput {
 input UpdateUserInput {
   id: String!
   contentful_token_read: String
+  name: String
 }
 
 input CreateContentModelInput {
