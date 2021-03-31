@@ -33,6 +33,8 @@ import { ContentModelService } from './content-model.service';
 import normalizeContentModelPosition from './helpers/normalizeContentModelPosition';
 import { CreateContentModelInput } from './inputs/create-content-model.input';
 import { DeleteContentModelInput } from './inputs/delete-content-model.input';
+import { StarContentModelInput } from './inputs/star-content-model.input';
+import { UnstarContentModelInput } from './inputs/unstar-content-mode.input';
 import { UpdateContentModelInput } from './inputs/update-content-model.input';
 import { PaginatedContentModel } from './paginated-content-model.model';
 import parseContentModel from './parsers/parseContentModel';
@@ -177,6 +179,11 @@ export class ContentModelResolver {
           },
           user: true,
           ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
         },
         where: queryWhere,
       }),
@@ -207,6 +214,13 @@ export class ContentModelResolver {
           ...contentModel,
           model: JSON.stringify(contentModel.versions[0].model),
           position: JSON.stringify(contentModel.versions[0].position),
+          stars: contentModel.stars.length,
+          starred:
+            currentUser === null
+              ? false
+              : contentModel.stars.some(
+                  (star) => star.authorId === currentUser.id,
+                ),
           ogMetaImage: contentModel.ogMetaImage
             ? {
                 width: contentModel.ogMetaImage.width,
@@ -289,6 +303,11 @@ export class ContentModelResolver {
           },
           user: true,
           ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
         },
       }),
     );
@@ -323,6 +342,11 @@ export class ContentModelResolver {
       ...contentModel,
       model: JSON.stringify(contentModel.versions[0].model),
       position: JSON.stringify(contentModel.versions[0].position),
+      stars: contentModel.stars.length,
+      starred:
+        currentUser === null
+          ? false
+          : contentModel.stars.some((star) => star.authorId === currentUser.id),
       ogMetaImage: contentModel.ogMetaImage
         ? {
             width: contentModel.ogMetaImage.width,
@@ -486,6 +510,11 @@ export class ContentModelResolver {
             take: 1,
           },
           user: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
         },
       }),
     );
@@ -499,6 +528,10 @@ export class ContentModelResolver {
       ...createdContentModel,
       model: JSON.stringify(createdContentModel.versions[0].model),
       position: JSON.stringify(createdContentModel.versions[0].position),
+      stars: createdContentModel.stars.length,
+      starred: createdContentModel.stars.some(
+        (star) => star.authorId === user.id,
+      ),
       ogMetaImage: null,
       image: null,
       imageNoConnections: null,
@@ -707,6 +740,11 @@ export class ContentModelResolver {
           },
           user: true,
           ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
         },
       }),
     );
@@ -720,6 +758,10 @@ export class ContentModelResolver {
       ...updatedContentModel,
       model: JSON.stringify(updatedContentModel.versions[0].model),
       position: JSON.stringify(updatedContentModel.versions[0].position),
+      stars: updatedContentModel.stars.length,
+      starred: updatedContentModel.stars.some(
+        (star) => star.authorId === user.id,
+      ),
       ogMetaImage: updatedContentModel.ogMetaImage
         ? {
             width: updatedContentModel.ogMetaImage.width,
@@ -829,6 +871,11 @@ export class ContentModelResolver {
           },
           user: true,
           ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
         },
       }),
     );
@@ -870,6 +917,306 @@ export class ContentModelResolver {
       ...contentModelInDb,
       model: JSON.stringify(contentModelInDb.versions[0].model),
       position: JSON.stringify(contentModelInDb.versions[0].position),
+      stars: contentModelInDb.stars.length,
+      starred: contentModelInDb.stars.some((star) => star.authorId === user.id),
+      ogMetaImage: contentModelInDb.ogMetaImage
+        ? {
+            width: contentModelInDb.ogMetaImage.width,
+            height: contentModelInDb.ogMetaImage.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.ogMetaImage,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.ogMetaImage,
+            ),
+          }
+        : null,
+      image: contentModelInDb.versions[0].image
+        ? {
+            width: contentModelInDb.versions[0].image.width,
+            height: contentModelInDb.versions[0].image.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].image,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].image,
+            ),
+          }
+        : null,
+      imageNoConnections: contentModelInDb.versions[0].imageNoConnections
+        ? {
+            width: contentModelInDb.versions[0].imageNoConnections.width,
+            height: contentModelInDb.versions[0].imageNoConnections.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+          }
+        : null,
+    };
+  }
+
+  @Mutation(() => ContentModel)
+  @UseGuards(GqlAuthGuard)
+  async starContentModel(
+    @AccessTokenEntity() accessToken: AccessToken,
+    @Args('starContentModel') starContentModel: StarContentModelInput,
+  ): Promise<ContentModel> {
+    const user = await this.userService.getUserByAuth0Id({
+      auth0Id: accessToken.sub,
+    });
+
+    const { id } = starContentModel;
+
+    const [contentModelInDbError, contentModelInDb] = await catchify(
+      this.prisma.contentModel.findUnique({
+        where: { id },
+        include: {
+          versions: {
+            orderBy: {
+              version: 'desc' as const,
+            },
+            take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
+          },
+          user: true,
+          ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
+        },
+      }),
+    );
+
+    if (contentModelInDbError !== null) {
+      console.error(contentModelInDbError);
+      throw new InternalServerErrorException('Something went wrong');
+    }
+
+    if (contentModelInDb === null) {
+      throw new BadRequestException('Could not find the content model');
+    }
+
+    if (
+      contentModelInDb.stars.some((star) => star.authorId === user.id) === true
+    ) {
+      // This user already starred this content model, do nothing
+      return {
+        ...contentModelInDb,
+        model: JSON.stringify(contentModelInDb.versions[0].model),
+        position: JSON.stringify(contentModelInDb.versions[0].position),
+        stars: contentModelInDb.stars.length,
+        starred: true,
+        ogMetaImage: contentModelInDb.ogMetaImage
+          ? {
+              width: contentModelInDb.ogMetaImage.width,
+              height: contentModelInDb.ogMetaImage.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.ogMetaImage,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.ogMetaImage,
+              ),
+            }
+          : null,
+        image: contentModelInDb.versions[0].image
+          ? {
+              width: contentModelInDb.versions[0].image.width,
+              height: contentModelInDb.versions[0].image.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.versions[0].image,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.versions[0].image,
+              ),
+            }
+          : null,
+        imageNoConnections: contentModelInDb.versions[0].imageNoConnections
+          ? {
+              width: contentModelInDb.versions[0].imageNoConnections.width,
+              height: contentModelInDb.versions[0].imageNoConnections.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.versions[0].imageNoConnections,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.versions[0].imageNoConnections,
+              ),
+            }
+          : null,
+      };
+    }
+
+    await catchify(
+      this.prisma.contentModelStar.create({
+        data: {
+          contentModelId: id,
+          authorId: user.id,
+        },
+      }),
+    );
+
+    return {
+      ...contentModelInDb,
+      model: JSON.stringify(contentModelInDb.versions[0].model),
+      position: JSON.stringify(contentModelInDb.versions[0].position),
+      stars: contentModelInDb.stars.length + 1,
+      starred: true,
+      ogMetaImage: contentModelInDb.ogMetaImage
+        ? {
+            width: contentModelInDb.ogMetaImage.width,
+            height: contentModelInDb.ogMetaImage.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.ogMetaImage,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.ogMetaImage,
+            ),
+          }
+        : null,
+      image: contentModelInDb.versions[0].image
+        ? {
+            width: contentModelInDb.versions[0].image.width,
+            height: contentModelInDb.versions[0].image.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].image,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].image,
+            ),
+          }
+        : null,
+      imageNoConnections: contentModelInDb.versions[0].imageNoConnections
+        ? {
+            width: contentModelInDb.versions[0].imageNoConnections.width,
+            height: contentModelInDb.versions[0].imageNoConnections.height,
+            src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+            path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+              contentModelInDb.versions[0].imageNoConnections,
+            ),
+          }
+        : null,
+    };
+  }
+
+  @Mutation(() => ContentModel)
+  @UseGuards(GqlAuthGuard)
+  async unstarContentModel(
+    @AccessTokenEntity() accessToken: AccessToken,
+    @Args('unstarContentModel') unstarContentModel: UnstarContentModelInput,
+  ): Promise<ContentModel> {
+    const user = await this.userService.getUserByAuth0Id({
+      auth0Id: accessToken.sub,
+    });
+
+    const { id } = unstarContentModel;
+
+    const [contentModelInDbError, contentModelInDb] = await catchify(
+      this.prisma.contentModel.findUnique({
+        where: { id },
+        include: {
+          versions: {
+            orderBy: {
+              version: 'desc' as const,
+            },
+            take: 1,
+            include: {
+              image: true,
+              imageNoConnections: true,
+            },
+          },
+          user: true,
+          ogMetaImage: true,
+          stars: {
+            select: {
+              authorId: true,
+            },
+          },
+        },
+      }),
+    );
+
+    if (contentModelInDbError !== null) {
+      console.error(contentModelInDbError);
+      throw new InternalServerErrorException('Something went wrong');
+    }
+
+    if (contentModelInDb === null) {
+      throw new BadRequestException('Could not find the content model');
+    }
+
+    if (
+      contentModelInDb.stars.some((star) => star.authorId === user.id) === false
+    ) {
+      // This user did not even star this content model, do nothing
+      return {
+        ...contentModelInDb,
+        model: JSON.stringify(contentModelInDb.versions[0].model),
+        position: JSON.stringify(contentModelInDb.versions[0].position),
+        stars: contentModelInDb.stars.length,
+        starred: false,
+        ogMetaImage: contentModelInDb.ogMetaImage
+          ? {
+              width: contentModelInDb.ogMetaImage.width,
+              height: contentModelInDb.ogMetaImage.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.ogMetaImage,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.ogMetaImage,
+              ),
+            }
+          : null,
+        image: contentModelInDb.versions[0].image
+          ? {
+              width: contentModelInDb.versions[0].image.width,
+              height: contentModelInDb.versions[0].image.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.versions[0].image,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.versions[0].image,
+              ),
+            }
+          : null,
+        imageNoConnections: contentModelInDb.versions[0].imageNoConnections
+          ? {
+              width: contentModelInDb.versions[0].imageNoConnections.width,
+              height: contentModelInDb.versions[0].imageNoConnections.height,
+              src: this.cloudinaryAssetService.generateCloudinaryAssetUrl(
+                contentModelInDb.versions[0].imageNoConnections,
+              ),
+              path: this.cloudinaryAssetService.generateCloudinaryAssetPath(
+                contentModelInDb.versions[0].imageNoConnections,
+              ),
+            }
+          : null,
+      };
+    }
+
+    await catchify(
+      this.prisma.contentModelStar.deleteMany({
+        where: {
+          contentModelId: id,
+          authorId: user.id,
+        },
+      }),
+    );
+
+    return {
+      ...contentModelInDb,
+      model: JSON.stringify(contentModelInDb.versions[0].model),
+      position: JSON.stringify(contentModelInDb.versions[0].position),
+      stars: contentModelInDb.stars.length - 1,
+      starred: false,
       ogMetaImage: contentModelInDb.ogMetaImage
         ? {
             width: contentModelInDb.ogMetaImage.width,

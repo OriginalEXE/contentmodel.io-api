@@ -49,6 +49,8 @@ type ContentModel {
   ogMetaImage: ImageAsset
   image: ImageAsset
   imageNoConnections: ImageAsset
+  stars: Float!
+  starred: Boolean!
 }
 
 type PaginationInfo {
@@ -74,6 +76,8 @@ type Mutation {
   createContentModel(createContentModel: CreateContentModelInput!): ContentModel!
   updateContentModel(updateContentModel: UpdateContentModelInput!): ContentModel!
   deleteContentModel(deleteContentModel: DeleteContentModelInput!): ContentModel!
+  starContentModel(starContentModel: StarContentModelInput!): ContentModel!
+  unstarContentModel(unstarContentModel: UnstarContentModelInput!): ContentModel!
 }
 
 input CreateUserInput {
@@ -114,5 +118,13 @@ input UpdateContentModelVersionInput {
 }
 
 input DeleteContentModelInput {
+  id: String!
+}
+
+input StarContentModelInput {
+  id: String!
+}
+
+input UnstarContentModelInput {
   id: String!
 }

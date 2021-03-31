@@ -15,6 +15,7 @@ model User {
   TeamUser              TeamUser[]
   ContentModel          ContentModel[]
   ContentModelVersion   ContentModelVersion[]
+  stars                 ContentModelStar[]
 }
 
 model Login {
@@ -72,6 +73,7 @@ model ContentModel {
   Tag             Tag?                   @relation(fields: [tagId], references: [id])
   tagId           String?
   ContentModelTag ContentModelTag[]
+  stars           ContentModelStar[]
 }
 
 model ContentModelVersion {
@@ -127,6 +129,16 @@ model CloudinaryAsset {
   imageContentModelVersion              ContentModelVersion? @relation("Image")
   imageNoConnectionsContentModelVersion ContentModelVersion? @relation("ImageNoConnections")
   ContentModel                          ContentModel[]
+}
+
+model ContentModelStar {
+  id             String       @id @default(uuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  contentModel   ContentModel @relation(fields: [contentModelId], references: [id])
+  contentModelId String
+  author         User         @relation(fields: [authorId], references: [id])
+  authorId       String
 }
 
 generator client {

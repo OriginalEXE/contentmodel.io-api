@@ -41,4 +41,10 @@ export class ContentModel extends Model {
 
   @Field(() => ImageAsset, { nullable: true })
   imageNoConnections: ImageAsset;
+
+  @Field(() => Number)
+  stars: number;
+
+  @Field(() => Boolean)
+  starred: boolean;
 }
